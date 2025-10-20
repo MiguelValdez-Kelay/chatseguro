@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Secure Chat • PIN de BBM</title>
+  <link rel="stylesheet" href="../static/styles.css">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    body {
+      background-color: #0b141a;
+      color: #e9edef;
+      font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .chat-container {
+      background: #111b21;
+      border-radius: 16px;
+      border: 1px solid #26323a;
+      width: 95%;
+      max-width: 950px;
+      height: 90vh;
+      display: flex;
+      flex-direction: column;
+      padding: 16px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #26323a;
+    }
+
+    header h2 {
+      margin: 0;
+      color: #00a884;
+    }
+
+    .user-info {
+      text-align: right;
+      font-size: 14px;
+      color: #8696a0;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      scrollbar-width: thin;
+    }
+
+    .bubble {
+      max-width: 75%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      word-wrap: break-word;
+      line-height: 1.4;
+    }
+
+    .self {
+      align-self: flex-end;
+      background-color: #005c4b;
+    }
+
+    .other {
+      align-self: flex-start;
+      background-color: #202c33;
+    }
+
+    .meta {
+      font-size: 11px;
+      opacity: 0.7;
+      margin-top: 3px;
+      text-align: right;
+    }
+
+    .system {
+      align-self: center;
+      background-color: #132e2a;
+      border: 1px dashed #1f876f;
+      color: #00ffae;
+    }
+
+    .composer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      border-top: 1px solid #26323a;
+      padding-top: 10px;
+    }
+
+    .composer input {
+      background-color: #0b1a21;
+      border: 1px solid #2a3942;
+      color: #e9edef;
+      padding: 12px;
+      border-radius: 10px;
+      outline: none;
+    }
+
+    .composer button {
+      background: #00a884;
+      color: #02140a;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .pin-box {
+      display: flex;
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .pin-box input {
+      flex: 1;
+      background-color: #0b1a21;
+      border: 1px solid #2a3942;
+      color: #e9edef;
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .pin-box button {
+      background: #00a884;
+      color: #02140a;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="chat-container">
+    <header>
+      <h2>Chat seguro • PIN de BBM</h2>
+      <div class="user-info">
+        <div>Tu nombre: <strong>{{ user['username'] }}</strong></div>
+        <div>Tu PIN: <strong>{{ user['pin'] }}</strong></div>
+      </div>
+    </header>
+
+    <div class="pin-box">
+      <input type="text" id="target_pin" placeholder="PIN del contacto (AB12-CD34)">
+      <button id="connect">Conectar</button>
+      <button id="clear">Limpiar</button>
+    </div>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="composer">
+      <input id="message_input" type="text" placeholder="Escribí un mensaje..." autocomplete="off">
+      <button id="send_btn">Enviar</button>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    const messagesDiv = document.getElementById('messages');
+    const input = document.getElementById('message_input');
+    const sendBtn = document.getElementById('send_btn');
+    const connectBtn = document.getElementById('connect');
+    const clearBtn = document.getElementById('clear');
+    const targetInput = document.getElementById('target_pin');
+
+    let currentTarget = "";
+
+    function addMessage(text, type = 'self', name = '', time = '') {
+      const div = document.createElement('div');
+      div.classList.add('bubble');
+      if (type === 'system') div.classList.add('system');
+      else if (type === 'other') div.classList.add('other');
+      else div.classList.add('self');
+
+      div.innerHTML = `
+        ${name ? `<strong>${name}:</strong> ` : ''}
+        ${text}
+        ${time ? `<div class='meta'>${time}</div>` : ''}
+      `;
+
+      messagesDiv.appendChild(div);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    // --- Conexión inicial ---
+    socket.emit("join_with_pin", {});
+
+    connectBtn.onclick = () => {
+      const targetPin = targetInput.value.trim();
+      if (!targetPin) return alert("Ingresá el PIN del contacto");
+      currentTarget = targetPin;
+      socket.emit("start_private_chat", { target_pin: targetPin });
+    };
+
+    clearBtn.onclick = () => {
+      messagesDiv.innerHTML = "";
+      currentTarget = "";
+    };
+
+    sendBtn.onclick = () => {
+      const text = input.value.trim();
+      if (!text || !currentTarget) return;
+      socket.emit("send_private_message", { target_pin: currentTarget, text });
+      addMessage(text, 'self', 'Tú', new Date().toLocaleTimeString().slice(0, 5));
+      input.value = '';
+    };
+
+    // --- Recepción de mensajes ---
+    socket.on("receive_message", (msg) => {
+      if (msg.text && msg.from_pin && msg.from_name) {
+        const label = `${msg.from_name}`;
+        addMessage(msg.text, 'other', label, msg.time);
+      }
+    });
+
+    socket.on("system_message", (msg) => {
+      addMessage(msg.text, 'system', '', msg.time);
+    });
+  </script>
+</body>
+</html>
