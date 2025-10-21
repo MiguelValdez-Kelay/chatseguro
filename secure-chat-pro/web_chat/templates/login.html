@@ -1,114 +1,149 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Secure Chat • Login</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Secure Chat Login</title>
   <style>
+    :root {
+      --bg: #0b141a;
+      --panel: #111b21;
+      --text: #e9edef;
+      --muted: #8696a0;
+      --green: #00a884;
+    }
+
     body {
-      background-color: #0b141a;
-      color: #e9edef;
-      font-family: system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, Segoe UI, Roboto, Helvetica, Arial;
       display: flex;
-      justify-content: center;
       align-items: center;
+      justify-content: center;
       height: 100vh;
       margin: 0;
     }
+
     .card {
-      background: #111b21;
-      border-radius: 12px;
-      padding: 24px;
-      box-shadow: 0 0 10px #00a88455;
-      width: 320px;
+      background: var(--panel);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 0 20px rgba(0, 168, 132, 0.1);
       text-align: center;
+      width: 320px;
     }
-    h2 { color: #00a884; margin-bottom: 12px; }
+
     input {
       width: 100%;
-      padding: 10px;
-      margin: 8px 0;
-      border-radius: 8px;
-      border: 1px solid #26323a;
+      padding: 12px;
+      border: 1px solid #2a3942;
+      border-radius: 10px;
       background: #0b1a21;
-      color: #e9edef;
+      color: var(--text);
+      margin-bottom: 12px;
+      outline: none;
     }
+
     button {
       width: 100%;
-      padding: 10px;
-      background: #00a884;
+      padding: 12px;
+      background: var(--green);
       border: none;
-      border-radius: 8px;
+      border-radius: 10px;
+      color: #02140a;
       font-weight: bold;
       cursor: pointer;
+      transition: 0.2s;
     }
+
     button:hover {
-      background: #00c298;
+      filter: brightness(1.1);
     }
-    .toggle {
-      margin-top: 10px;
-      font-size: 13px;
-      color: #8696a0;
+
+    .switch {
+      margin-top: 15px;
+      color: var(--muted);
       cursor: pointer;
+      font-size: 14px;
     }
+
     .msg {
-      font-size: 13px;
-      margin-top: 8px;
-      color: #00a884;
+      margin-top: 10px;
+      font-size: 14px;
     }
   </style>
 </head>
 <body>
   <div class="card">
-    <h2 id="formTitle">Iniciar sesión</h2>
-    <input type="text" id="username" placeholder="Usuario" required>
-    <input type="password" id="password" placeholder="Contraseña" required>
-    <button id="submitBtn">Entrar</button>
-    <div class="toggle" id="toggleMode">¿No tenés cuenta? Registrate</div>
-    <div class="msg" id="msg"></div>
+    <h2 id="title">Crear cuenta</h2>
+    <input id="username" type="text" placeholder="Usuario" />
+    <input id="password" type="password" placeholder="Contraseña" />
+    <button id="actionBtn" onclick="handleAction()">Registrarse</button>
+    <div class="switch" onclick="toggleMode()">¿Ya tenés cuenta? Iniciá sesión</div>
+    <div id="message" class="msg"></div>
   </div>
 
   <script>
-    let isLogin = true;
-    const msg = document.getElementById("msg");
-    const toggleMode = document.getElementById("toggleMode");
-    const submitBtn = document.getElementById("submitBtn");
-    const formTitle = document.getElementById("formTitle");
+    let mode = "register"; // "login" o "register"
 
-    toggleMode.onclick = () => {
-      isLogin = !isLogin;
-      formTitle.textContent = isLogin ? "Iniciar sesión" : "Crear cuenta";
-      submitBtn.textContent = isLogin ? "Entrar" : "Registrarse";
-      toggleMode.textContent = isLogin
-        ? "¿No tenés cuenta? Registrate"
-        : "¿Ya tenés cuenta? Iniciá sesión";
+    function toggleMode() {
+      const title = document.getElementById("title");
+      const btn = document.getElementById("actionBtn");
+      const switcher = document.querySelector(".switch");
+      const msg = document.getElementById("message");
+
+      if (mode === "register") {
+        mode = "login";
+        title.textContent = "Iniciar sesión";
+        btn.textContent = "Entrar";
+        switcher.textContent = "¿No tenés cuenta? Registrate";
+      } else {
+        mode = "register";
+        title.textContent = "Crear cuenta";
+        btn.textContent = "Registrarse";
+        switcher.textContent = "¿Ya tenés cuenta? Iniciá sesión";
+      }
       msg.textContent = "";
-    };
+    }
 
-    submitBtn.onclick = async () => {
+    async function handleAction() {
       const username = document.getElementById("username").value.trim();
       const password = document.getElementById("password").value.trim();
+      const msg = document.getElementById("message");
+
       if (!username || !password) {
-        msg.textContent = "Completá todos los campos.";
+        msg.textContent = "Completa todos los campos.";
+        msg.style.color = "orange";
         return;
       }
 
-      const endpoint = isLogin ? "/api/login" : "/api/register_user";
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
-      });
+      const endpoint = mode === "register" ? "/api/register" : "/api/login";
+      const payload = { username, password };
 
-      const data = await res.json();
-      msg.textContent = data.message;
+      try {
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
 
-      if (res.ok && data.success) {
-        localStorage.setItem("pin", data.pin);
-        localStorage.setItem("username", username);
-        window.location.href = "/";
+        const data = await res.json();
+        if (data.success) {
+          msg.textContent = data.message + (data.pin ? ` Tu PIN: ${data.pin}` : "");
+          msg.style.color = "lightgreen";
+          // Redirigir al chat
+          setTimeout(() => {
+            window.location.href = "/";
+          }, 1200);
+        } else {
+          msg.textContent = data.message || "Error inesperado.";
+          msg.style.color = "tomato";
+        }
+      } catch (err) {
+        msg.textContent = "Error de conexión con el servidor.";
+        msg.style.color = "tomato";
       }
-    };
+    }
   </script>
 </body>
 </html>

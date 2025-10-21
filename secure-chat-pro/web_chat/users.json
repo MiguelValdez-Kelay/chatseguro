@@ -1,4 +1,14 @@
 {
-  "users": []
+  "users": [
+    {
+      "username": "miguel",
+      "password": "5994471abb01112afcc18159f6cc74b4f511b99806da59b3caf5a9c173cacfc5",
+      "pin": "DHWS-H5JC"
+    },
+    {
+      "username": "chukyneator",
+      "password": "28efae27841e809338eee10e5c04efe569ec4b4a6004333e0e9c69fd753d3706",
+      "pin": "MC32-M6EM"
+    }
+  ]
 }
-
