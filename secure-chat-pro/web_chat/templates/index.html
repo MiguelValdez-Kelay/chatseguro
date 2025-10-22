@@ -145,7 +145,24 @@
   </style>
 </head>
 
+
 <body>
+  <div id="sidebar" style="
+  position: fixed;
+  left: 10px;
+  top: 10px;
+  bottom: 10px;
+  width: 200px;
+  background: #111b21;
+  border: 1px solid #26323a;
+  border-radius: 10px;
+  padding: 10px;
+  overflow-y: auto;
+  color: #00a884;">
+  <h3>Contactos</h3>
+  <ul id="contact_list" style="list-style:none; padding:0; margin:0;"></ul>
+</div>
+
   <div class="chat-container">
     <header>
       <h2>Chat seguro • PIN de BBM</h2>
@@ -178,20 +195,30 @@
     const clearBtn = document.getElementById('clear');
     const targetInput = document.getElementById('target_pin');
 
-    let currentTarget = "";
+    // 🧾 datos del usuario actual (para distinguir "self/other")
+    const myName = "{{ user['username'] }}";
+    const myPin  = "{{ user['pin'] }}";
 
-    function addMessage(text, type = 'self', name = '', time = '') {
+    let currentTarget = "";
+    let lastSelfDiv = null; // para marcar "Leído ✅" en el último mensaje propio
+
+    function addMessage(text, type = 'self', name = '', time = '', opts = {}) {
       const div = document.createElement('div');
       div.classList.add('bubble');
       if (type === 'system') div.classList.add('system');
       else if (type === 'other') div.classList.add('other');
       else div.classList.add('self');
 
-      div.innerHTML = `
-        ${name ? `<strong>${name}:</strong> ` : ''}${text}
-        ${time ? `<div class='meta'>${time}</div>` : ''}`;
+      const metaHtml = time ? `<div class='meta'>${time}${opts.read ? ' • ✅ Leído' : ''}</div>` : (opts.read ? `<div class='meta'>✅ Leído</div>` : '');
+      div.innerHTML = `${name ? `<strong>${name}:</strong> ` : ''}${text}${metaHtml}`;
       messagesDiv.appendChild(div);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+      return div; // devolver referencia por si hay que actualizar
+    }
+
+    function hhmm() {
+      return new Date().toLocaleTimeString().slice(0,5);
     }
 
     // 🔹 Registrar usuario al conectarse
@@ -199,7 +226,7 @@
       socket.emit("register_user", {});
     });
 
-    // 🔹 Conectar con otro usuario por PIN
+    // 🔹 Conectar con otro usuario por PIN (y pedir historial al servidor)
     connectBtn.onclick = () => {
       const targetPin = targetInput.value.trim().toUpperCase();
       if (!targetPin) return alert("Ingresá el PIN del contacto");
@@ -207,16 +234,29 @@
       socket.emit("connect_to_user", { target: targetPin });
     };
 
+    // 🔹 Cargar historial que envía el servidor
+    socket.on("load_history", (payload) => {
+      const history = (payload && payload.history) || [];
+      messagesDiv.innerHTML = ""; // limpiamos y pintamos historial
+      history.forEach(item => {
+        // En backend guardamos sender como nombre (sender_name)
+        const type = (item.sender === myName) ? 'self' : 'other';
+        const who  = (type === 'self') ? 'Tú' : item.sender;
+        addMessage(item.message, type, who, item.time || '');
+      });
+    });
+
     // 🔹 Enviar mensaje
     sendBtn.onclick = () => {
       const text = input.value.trim();
       if (!text) return;
       if (!currentTarget) {
-        addMessage("Primero conectate a un PIN.", "system", "", new Date().toLocaleTimeString().slice(0,5));
+        addMessage("Primero conectate a un PIN.", "system", "", hhmm());
         return;
       }
       socket.emit("send_message", { receiver: currentTarget, message: text });
-      addMessage(text, "self", "Tú", new Date().toLocaleTimeString().slice(0,5));
+      // pintamos nuestro propio mensaje de una vez
+      lastSelfDiv = addMessage(text, "self", "Tú", hhmm());
       input.value = "";
     };
 
@@ -232,12 +272,36 @@
     clearBtn.onclick = () => {
       messagesDiv.innerHTML = "";
       currentTarget = "";
+      lastSelfDiv = null;
     };
 
-    // 🔹 Recibir mensajes
+    // 🔹 Recibir mensajes (de la otra persona)
     socket.on("receive_message", (data) => {
       if (data && data.message) {
         addMessage(data.message, "other", data.sender || "Contacto", data.time);
+        // Avisamos que lo leímos (confirmación de lectura)
+        // Enviamos el nombre del remitente tal como vino en data.sender
+        socket.emit("message_read", { sender: data.sender });
+      }
+    });
+
+    // 🔹 Confirmación de lectura (el otro leyó nuestro mensaje)
+    socket.on("message_read_confirmed", (data) => {
+      // Marcamos el último mensaje propio como "Leído "
+      if (lastSelfDiv) {
+        const meta = lastSelfDiv.querySelector('.meta');
+        if (meta) {
+          if (!meta.textContent.includes('Leído')) {
+            meta.textContent = meta.textContent
+              ? meta.textContent + ' •  Leído'
+              : ' Leído';
+          }
+        } else {
+          const m = document.createElement('div');
+          m.className = 'meta';
+          m.textContent = ' Leído';
+          lastSelfDiv.appendChild(m);
+        }
       }
     });
 

@@ -73,3 +73,25 @@ document.addEventListener("DOMContentLoaded", () => {
   socket.emit("register_user", { pin: myPin });
   appendMessage(`PIN propio: ${myPin}. Listo para conectar.`, "center");
 });
+
+// 🔹 Cargar contactos guardados al iniciar
+async function loadContacts() {
+  const res = await fetch("/api/contacts");
+  const list = await res.json();
+  const ul = document.getElementById("contact_list");
+  ul.innerHTML = "";
+  list.forEach(pin => {
+    const li = document.createElement("li");
+    li.textContent = pin;
+    li.style.cursor = "pointer";
+    li.style.margin = "6px 0";
+    li.onclick = () => {
+      currentTarget = pin;
+      socket.emit("connect_to_user", { target: pin });
+      addMessage(`Conectado a ${pin}`, "system");
+    };
+    ul.appendChild(li);
+  });
+}
+loadContacts();
+
