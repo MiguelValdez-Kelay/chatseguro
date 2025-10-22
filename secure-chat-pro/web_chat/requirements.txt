@@ -1,4 +1,4 @@
-
+setuptools==68.0.0
 flask==3.0.3
 flask-socketio==5.3.6
 python-socketio[client]==5.10.0
