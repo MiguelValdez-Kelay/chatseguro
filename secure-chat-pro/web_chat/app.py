@@ -231,7 +231,8 @@ def send_message(data):
         "time": now_hhmm()
     }, room=rm, include_self=False)
 
-
+    #cambio real
+    
 
 @socketio.on("disconnect")
 def on_disconnect():
