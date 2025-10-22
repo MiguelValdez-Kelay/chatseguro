@@ -200,6 +200,9 @@ def send_message(data):
         return
 
     sender_pin = user["pin"].upper()
+    # nombre desde la sesión (más barato); fallback a PIN si faltara
+    sender_name = user.get("username") or sender_pin
+
     receiver = (data.get("receiver") or "").strip().upper()
     message = (data.get("message") or "").strip()
 
@@ -208,18 +211,26 @@ def send_message(data):
         return
 
     rm = room_for(sender_pin, receiver)
-    
+
     # Verificamos si el usuario está en la sala antes de enviar
     if rm not in sid_to_rooms.get(request.sid, set()):
-         emit("system_message", {"text": "Error: Debes conectar con el PIN antes de enviar mensajes.", "time": now_hhmm()})
-         return
-         
+        emit("system_message", {"text": "Error: Debes conectar con el PIN antes de enviar mensajes.", "time": now_hhmm()})
+        return
+
+    # Fallback adicional por si la sesión no trajera username (opcional, pero seguro)
+    if sender_name == sender_pin:
+        db = load_users()
+        u = next((u for u in db.get("users", []) if u.get("pin", "").upper() == sender_pin), None)
+        if u and u.get("username"):
+            sender_name = u["username"]
+
     emit("receive_message", {
-        "sender": sender_pin,
+        "sender": sender_name,   # ← ahora va el NOMBRE, no el PIN
         "receiver": receiver,
         "message": message,
         "time": now_hhmm()
-    }, room=rm)
+    }, room=rm, include_self=False)
+
 
 
 @socketio.on("disconnect")

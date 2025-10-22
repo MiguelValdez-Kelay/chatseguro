@@ -188,48 +188,62 @@
       else div.classList.add('self');
 
       div.innerHTML = `
-        ${name ? `<strong>${name}:</strong> ` : ''}
-        ${text}
-        ${time ? `<div class='meta'>${time}</div>` : ''}
-      `;
-
+        ${name ? `<strong>${name}:</strong> ` : ''}${text}
+        ${time ? `<div class='meta'>${time}</div>` : ''}`;
       messagesDiv.appendChild(div);
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
 
-    // --- Conexión inicial ---
-    socket.emit("join_with_pin", {});
+    // 🔹 Registrar usuario al conectarse
+    socket.on("connect", () => {
+      socket.emit("register_user", {});
+    });
 
+    // 🔹 Conectar con otro usuario por PIN
     connectBtn.onclick = () => {
-      const targetPin = targetInput.value.trim();
+      const targetPin = targetInput.value.trim().toUpperCase();
       if (!targetPin) return alert("Ingresá el PIN del contacto");
       currentTarget = targetPin;
-      socket.emit("start_private_chat", { target_pin: targetPin });
+      socket.emit("connect_to_user", { target: targetPin });
     };
 
+    // 🔹 Enviar mensaje
+    sendBtn.onclick = () => {
+      const text = input.value.trim();
+      if (!text) return;
+      if (!currentTarget) {
+        addMessage("Primero conectate a un PIN.", "system", "", new Date().toLocaleTimeString().slice(0,5));
+        return;
+      }
+      socket.emit("send_message", { receiver: currentTarget, message: text });
+      addMessage(text, "self", "Tú", new Date().toLocaleTimeString().slice(0,5));
+      input.value = "";
+    };
+
+    // 🔹 Enviar con Enter
+    input.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        sendBtn.click();
+      }
+    });
+
+    // 🔹 Limpiar chat
     clearBtn.onclick = () => {
       messagesDiv.innerHTML = "";
       currentTarget = "";
     };
 
-    sendBtn.onclick = () => {
-      const text = input.value.trim();
-      if (!text || !currentTarget) return;
-      socket.emit("send_private_message", { target_pin: currentTarget, text });
-      addMessage(text, 'self', 'Tú', new Date().toLocaleTimeString().slice(0, 5));
-      input.value = '';
-    };
-
-    // --- Recepción de mensajes ---
-    socket.on("receive_message", (msg) => {
-      if (msg.text && msg.from_pin && msg.from_name) {
-        const label = `${msg.from_name}`;
-        addMessage(msg.text, 'other', label, msg.time);
+    // 🔹 Recibir mensajes
+    socket.on("receive_message", (data) => {
+      if (data && data.message) {
+        addMessage(data.message, "other", data.sender || "Contacto", data.time);
       }
     });
 
+    // 🔹 Mensajes del sistema
     socket.on("system_message", (msg) => {
-      addMessage(msg.text, 'system', '', msg.time);
+      if (msg && msg.text) addMessage(msg.text, "system", "", msg.time);
     });
   </script>
 </body>
