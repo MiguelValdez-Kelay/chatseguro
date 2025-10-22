@@ -1,5 +1,0 @@
-[build]
-builder = "paketo-buildpacks/python"
-
-[deploy]
-startCommand = "python web_chat/app.py"
